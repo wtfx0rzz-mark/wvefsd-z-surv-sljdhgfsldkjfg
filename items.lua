@@ -13,6 +13,32 @@ return function(C, R, UI)
     local DROP_OFFSET = CFrame.new(0, -3, -8)
     local DROP_COOLDOWN = 2
     local dropCooldownActive = false
+    local ownedItems = {}
+
+    local function claimOwnership(item)
+        if ownedItems[item] then return true end
+        local drag = item:FindFirstChild("ItemDrag")
+        if not drag then return false end
+        local remote = drag:FindFirstChild("RequestNetworkOwnership")
+        if not remote then return false end
+        local mainPart = item:FindFirstChild("MainPart") or item:FindFirstChild("Handle")
+        if not mainPart then
+            for _, child in ipairs(item:GetChildren()) do
+                if child:IsA("BasePart") then
+                    mainPart = child
+                    break
+                end
+            end
+        end
+        if not mainPart then return false end
+        local ok = pcall(function()
+            remote:FireServer(mainPart)
+        end)
+        if ok then
+            ownedItems[item] = true
+        end
+        return ok
+    end
 
     tab:Section({ Title = "Item Magnet" })
 
@@ -21,6 +47,9 @@ return function(C, R, UI)
         Value = C.State.Toggles.ItemMagnet,
         Callback = function(on)
             C.State.Toggles.ItemMagnet = on
+            if not on then
+                ownedItems = {}
+            end
         end
     })
 
@@ -84,6 +113,8 @@ return function(C, R, UI)
                 end
             end
 
+            ownedItems = {}
+
             task.delay(DROP_COOLDOWN, function()
                 C.State.Toggles.MagnetDropping = false
                 dropCooldownActive = false
@@ -114,13 +145,15 @@ return function(C, R, UI)
             if handle then
                 local dist = (rootPos - handle.Position).Magnitude
                 if dist <= C.Config.MagnetRadius then
-                    pcall(function()
-                        handle.Anchored = false
-                        handle.CanCollide = false
-                        handle.CFrame = rootPart.CFrame * MAGNET_OFFSET
-                        handle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-                        handle.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-                    end)
+                    if claimOwnership(item) then
+                        pcall(function()
+                            handle.Anchored = false
+                            handle.CanCollide = false
+                            handle.CFrame = rootPart.CFrame * MAGNET_OFFSET
+                            handle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                            handle.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                        end)
+                    end
                 end
             end
         end
