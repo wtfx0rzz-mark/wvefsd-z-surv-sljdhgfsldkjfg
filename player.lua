@@ -103,4 +103,107 @@ return function(C, R, UI)
         end)
         local a = p.Parent
         while a and a ~= workspace do
-            if strfindAny(a.Na
+            if strfindAny(a.Name, EXCLUDE_ANCESTOR_SUBSTR) then return true end
+            a = a.Parent
+        end
+        return false
+    end
+
+    local function restorePrompt(prompt)
+        local orig = promptDurations[prompt]
+        if orig ~= nil and prompt and prompt.Parent then
+            pcall(function() prompt.HoldDuration = orig end)
+        end
+        promptDurations[prompt] = nil
+    end
+
+    local function tagChestFromPrompt(prompt)
+        if not prompt then return end
+        local node = prompt
+        for _ = 1, 8 do
+            if not node then break end
+            if node:IsA("Model") then
+                local n = node.Name
+                if type(n) == "string" and (n:match("Chest%d*$") or n:match("Chest$")) then
+                    pcall(function()
+                        node:SetAttribute(UID_OPEN_KEY, true)
+                    end)
+                    break
+                end
+            end
+            node = node.Parent
+        end
+    end
+
+    local function onPromptShown(prompt)
+        if not prompt or not prompt:IsA("ProximityPrompt") then return end
+        if not C.State.Toggles.InstantInteract then return end
+        if shouldSkipPrompt(prompt) then return end
+        if promptDurations[prompt] == nil then
+            promptDurations[prompt] = prompt.HoldDuration
+        end
+        if prompt and prompt.Parent then
+            pcall(function() prompt.HoldDuration = INSTANT_HOLD end)
+        end
+    end
+
+    local function enableInstantInteract()
+        if C.Connections.PromptShown then return end
+
+        C.Connections.PromptShown = PPS.PromptShown:Connect(onPromptShown)
+
+        C.Connections.PromptTriggered = PPS.PromptTriggered:Connect(function(prompt, player)
+            if player ~= lp or shouldSkipPrompt(prompt) then return end
+            tagChestFromPrompt(prompt)
+            if TRIGGER_COOLDOWN and TRIGGER_COOLDOWN > 0 then
+                pcall(function() prompt.Enabled = false end)
+                task.delay(TRIGGER_COOLDOWN, function()
+                    if prompt and prompt.Parent then
+                        pcall(function() prompt.Enabled = true end)
+                    end
+                end)
+            end
+            restorePrompt(prompt)
+        end)
+
+        C.Connections.PromptHidden = PPS.PromptHidden:Connect(function(prompt)
+            if shouldSkipPrompt(prompt) then return end
+            restorePrompt(prompt)
+        end)
+    end
+
+    local function disableInstantInteract()
+        if C.Connections.PromptShown then
+            C.Connections.PromptShown:Disconnect()
+            C.Connections.PromptShown = nil
+        end
+        if C.Connections.PromptTriggered then
+            C.Connections.PromptTriggered:Disconnect()
+            C.Connections.PromptTriggered = nil
+        end
+        if C.Connections.PromptHidden then
+            C.Connections.PromptHidden:Disconnect()
+            C.Connections.PromptHidden = nil
+        end
+        for p, _ in pairs(promptDurations) do
+            restorePrompt(p)
+        end
+    end
+
+    if C.State.Toggles.InstantInteract then
+        enableInstantInteract()
+    end
+
+    tab:Toggle({
+        Title = "Instant Interact",
+        Value = C.State.Toggles.InstantInteract,
+        Callback = function(on)
+            C.State.Toggles.InstantInteract = on
+            if on then
+                enableInstantInteract()
+            else
+                disableInstantInteract()
+            end
+        end
+    })
+end
