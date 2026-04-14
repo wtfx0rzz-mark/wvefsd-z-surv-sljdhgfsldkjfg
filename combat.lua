@@ -1,48 +1,48 @@
 -- combat.lua
-return function()
-    local ZT = _G.ZT
-    local tab = ZT.Tabs.Combat
-    local State = ZT.State
-    local Connections = ZT.Connections
-    local U = ZT.Util
-    local RunService = U.Services.RunService
-    local Workspace = U.Services.Workspace
-    local lp = U.lp
+return function(C, R, UI)
+    C = C or _G.C
+    UI = UI or _G.UI
+
+    local tab = UI.Tabs.Combat
+    local lp = C.LocalPlayer
+    local U = C.Util
+    local RunService = C.Services.Run
+    local WS = C.Services.WS
 
     tab:Section({ Title = "Auto Hit" })
 
     tab:Toggle({
         Title = "Enable Auto Hit",
-        Value = State.AutoHit,
+        Value = C.State.Toggles.AutoHit,
         Callback = function(on)
-            State.AutoHit = on
+            C.State.Toggles.AutoHit = on
         end
     })
 
     local lastWeaponName = ""
 
-    Connections.AutoHit = RunService.Heartbeat:Connect(function()
+    C.Connections.AutoHit = RunService.Heartbeat:Connect(function()
         local char = U.getChar()
         if char then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then
-                if hum.WalkSpeed ~= State.WalkSpeed then
-                    hum.WalkSpeed = State.WalkSpeed
+                if hum.WalkSpeed ~= C.Config.WalkSpeed then
+                    hum.WalkSpeed = C.Config.WalkSpeed
                 end
-                if hum.JumpPower ~= State.JumpPower then
+                if hum.JumpPower ~= C.Config.JumpPower then
                     hum.UseJumpPower = true
-                    hum.JumpPower = State.JumpPower
+                    hum.JumpPower = C.Config.JumpPower
                 end
             end
         end
 
-        if not State.AutoHit then return end
+        if not C.State.Toggles.AutoHit then return end
 
         local rootPart = U.getRoot()
         if not rootPart then return end
         local rootPos = rootPart.Position
 
-        local charsFolder = Workspace:FindFirstChild("Characters")
+        local charsFolder = WS:FindFirstChild("Characters")
         if not charsFolder then return end
 
         local myChar = U.getChar()
@@ -64,7 +64,6 @@ return function()
         if not tool then return end
 
         local hitRange = U.getWeaponRange(tool)
-
         local weaponName = tool.Name
         if weaponName ~= lastWeaponName then
             lastWeaponName = weaponName
