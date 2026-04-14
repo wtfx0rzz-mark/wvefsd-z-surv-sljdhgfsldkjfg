@@ -1,13 +1,13 @@
 -- items.lua
-return function()
-    local ZT = _G.ZT
-    local tab = ZT.Tabs.Items
-    local State = ZT.State
-    local Connections = ZT.Connections
-    local U = ZT.Util
-    local RunService = U.Services.RunService
-    local Workspace = U.Services.Workspace
-    local WindUI = ZT.WindUI
+return function(C, R, UI)
+    C = C or _G.C
+    UI = UI or _G.UI
+
+    local tab = UI.Tabs.Items
+    local U = C.Util
+    local RunService = C.Services.Run
+    local WS = C.Services.WS
+    local WindUI = UI.Lib
 
     local MAGNET_OFFSET = CFrame.new(0, -2, -3)
     local DROP_OFFSET = CFrame.new(0, -3, -8)
@@ -18,9 +18,9 @@ return function()
 
     tab:Toggle({
         Title = "Enable Item Magnet",
-        Value = State.ItemMagnet,
+        Value = C.State.Toggles.ItemMagnet,
         Callback = function(on)
-            State.ItemMagnet = on
+            C.State.Toggles.ItemMagnet = on
         end
     })
 
@@ -29,12 +29,12 @@ return function()
         Value = {
             Min = 5,
             Max = 50,
-            Default = State.MagnetRadius,
+            Default = C.Config.MagnetRadius,
         },
         Callback = function(v)
             local n = tonumber(type(v) == "table" and (v.Value or v.Current or v.Default) or v)
             if not n then return end
-            State.MagnetRadius = math.clamp(n, 5, 50)
+            C.Config.MagnetRadius = math.clamp(n, 5, 50)
         end
     })
 
@@ -52,18 +52,18 @@ return function()
             end
 
             dropCooldownActive = true
-            State.MagnetDropping = true
+            C.State.Toggles.MagnetDropping = true
 
             local rootPart = U.getRoot()
             if not rootPart then
-                State.MagnetDropping = false
+                C.State.Toggles.MagnetDropping = false
                 dropCooldownActive = false
                 return
             end
 
-            local droppedItems = Workspace:FindFirstChild("DroppedItems")
+            local droppedItems = WS:FindFirstChild("DroppedItems")
             if not droppedItems then
-                State.MagnetDropping = false
+                C.State.Toggles.MagnetDropping = false
                 dropCooldownActive = false
                 return
             end
@@ -73,7 +73,7 @@ return function()
                 local handle = U.getItemHandle(item)
                 if handle then
                     local dist = (rootPart.Position - handle.Position).Magnitude
-                    if dist < State.MagnetRadius then
+                    if dist < C.Config.MagnetRadius then
                         pcall(function()
                             handle.CFrame = rootPart.CFrame * DROP_OFFSET
                             handle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -85,7 +85,7 @@ return function()
             end
 
             task.delay(DROP_COOLDOWN, function()
-                State.MagnetDropping = false
+                C.State.Toggles.MagnetDropping = false
                 dropCooldownActive = false
             end)
 
@@ -98,22 +98,22 @@ return function()
         end
     })
 
-    Connections.ItemMagnet = RunService.Heartbeat:Connect(function()
-        if not State.ItemMagnet then return end
-        if State.MagnetDropping then return end
+    C.Connections.ItemMagnet = RunService.Heartbeat:Connect(function()
+        if not C.State.Toggles.ItemMagnet then return end
+        if C.State.Toggles.MagnetDropping then return end
 
         local rootPart = U.getRoot()
         if not rootPart then return end
         local rootPos = rootPart.Position
 
-        local droppedItems = Workspace:FindFirstChild("DroppedItems")
+        local droppedItems = WS:FindFirstChild("DroppedItems")
         if not droppedItems then return end
 
         for _, item in ipairs(droppedItems:GetChildren()) do
             local handle = U.getItemHandle(item)
             if handle then
                 local dist = (rootPos - handle.Position).Magnitude
-                if dist <= State.MagnetRadius then
+                if dist <= C.Config.MagnetRadius then
                     pcall(function()
                         handle.Anchored = false
                         handle.CanCollide = false
