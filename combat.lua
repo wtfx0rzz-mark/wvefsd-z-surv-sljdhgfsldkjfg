@@ -9,6 +9,8 @@ return function(C, R, UI)
     local RunService = C.Services.Run
     local WS = C.Services.WS
 
+    C.Config.HitRangeBonus = C.Config.HitRangeBonus or 0
+
     tab:Section({ Title = "Auto Hit" })
 
     tab:Toggle({
@@ -16,6 +18,20 @@ return function(C, R, UI)
         Value = C.State.Toggles.AutoHit,
         Callback = function(on)
             C.State.Toggles.AutoHit = on
+        end
+    })
+
+    tab:Slider({
+        Title = "Hit Range Bonus",
+        Value = {
+            Min = 0,
+            Max = 50,
+            Default = C.Config.HitRangeBonus,
+        },
+        Callback = function(v)
+            local n = tonumber(type(v) == "table" and (v.Value or v.Current or v.Default) or v)
+            if not n then return end
+            C.Config.HitRangeBonus = math.clamp(n, 0, 50)
         end
     })
 
@@ -63,7 +79,7 @@ return function(C, R, UI)
 
         if not tool then return end
 
-        local hitRange = U.getWeaponRange(tool)
+        local hitRange = U.getWeaponRange(tool) + C.Config.HitRangeBonus
         local weaponName = tool.Name
         if weaponName ~= lastWeaponName then
             lastWeaponName = weaponName
