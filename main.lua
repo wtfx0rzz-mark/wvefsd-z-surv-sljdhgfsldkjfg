@@ -1,7 +1,7 @@
 -- main.lua
 repeat task.wait() until game:IsLoaded()
 
-local BASE_URL = "https://raw.githubusercontent.com/YOUR_REPO_PATH/main/"
+local BASE_URL = "https://raw.githubusercontent.com/wtfx0rzz-mark/wvefsd-z-surv-sljdhgfsldkjfg/main/"
 
 local function httpget(u)
     return game:HttpGet(u)
