@@ -44,10 +44,9 @@ return function(C, R, UI)
         
         char.ChildAdded:Connect(function(child)
             if child:IsA("Tool") and U.findWeaponTool(char) == child then
-                if C.State.Toggles.AutoHit then
-                    return
+                if not C.State.Toggles.AutoHit then
+                    lastManualTool = child
                 end
-                lastManualTool = child
             end
         end)
     end
@@ -84,13 +83,28 @@ return function(C, R, UI)
         if not charsFolder then return end
 
         local myChar = U.getChar()
+        local tool = U.findWeaponTool(myChar)
+
+        local potentialRange
+        if tool then
+            potentialRange = U.getWeaponRange(tool) + C.Config.HitRangeBonus
+        else
+            local targetTool = lastManualTool
+            if not targetTool or not targetTool.Parent then
+                local backpack = lp:FindFirstChildOfClass("Backpack")
+                targetTool = U.findWeaponTool(backpack)
+            end
+            if targetTool then
+                potentialRange = U.getWeaponRange(targetTool) + C.Config.HitRangeBonus
+            else
+                return
+            end
+        end
 
         local validTargets = {}
-        local maxScanRange = 100
-        
         for _, child in ipairs(charsFolder:GetChildren()) do
             if U.isValidTarget(child, myChar) then
-                if U.distTo(child, rootPos) <= maxScanRange then
+                if U.distTo(child, rootPos) <= potentialRange then
                     table.insert(validTargets, child)
                 end
             end
@@ -98,11 +112,8 @@ return function(C, R, UI)
 
         if #validTargets == 0 then return end
 
-        local tool = U.findWeaponTool(myChar)
-        
         if not tool then
             local targetTool = lastManualTool
-            
             if not targetTool or not targetTool.Parent then
                 local backpack = lp:FindFirstChildOfClass("Backpack")
                 targetTool = U.findWeaponTool(backpack)
@@ -120,7 +131,6 @@ return function(C, R, UI)
 
         if not tool then return end
 
-        local hitRange = U.getWeaponRange(tool) + C.Config.HitRangeBonus
         local weaponName = tool.Name
         if weaponName ~= lastWeaponName then
             lastWeaponName = weaponName
@@ -130,16 +140,7 @@ return function(C, R, UI)
         local hitTargets = tool:FindFirstChild("HitTargets")
         if not swing or not hitTargets then return end
 
-        local targetsInRange = {}
-        for _, target in ipairs(validTargets) do
-            if U.distTo(target, rootPos) <= hitRange then
-                table.insert(targetsInRange, target)
-            end
-        end
-
-        if #targetsInRange == 0 then return end
-
         swing:FireServer()
-        hitTargets:FireServer(targetsInRange)
+        hitTargets:FireServer(validTargets)
     end)
 end
