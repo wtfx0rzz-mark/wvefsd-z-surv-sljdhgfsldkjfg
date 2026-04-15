@@ -36,6 +36,28 @@ return function(C, R, UI)
     })
 
     local lastWeaponName = ""
+    local lastManualTool = nil
+
+    local function setupCharacterTracking()
+        local char = U.getChar()
+        if not char then return end
+        
+        char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") and U.findWeaponTool(char) == child then
+                if C.State.Toggles.AutoHit then
+                    return
+                end
+                lastManualTool = child
+            end
+        end)
+    end
+
+    lp.CharacterAdded:Connect(function()
+        task.wait(0.1)
+        setupCharacterTracking()
+    end)
+    
+    setupCharacterTracking()
 
     C.Connections.AutoHit = RunService.Heartbeat:Connect(function()
         local char = U.getChar()
@@ -63,14 +85,33 @@ return function(C, R, UI)
 
         local myChar = U.getChar()
 
+        local validTargets = {}
+        local maxScanRange = 100
+        
+        for _, child in ipairs(charsFolder:GetChildren()) do
+            if U.isValidTarget(child, myChar) then
+                if U.distTo(child, rootPos) <= maxScanRange then
+                    table.insert(validTargets, child)
+                end
+            end
+        end
+
+        if #validTargets == 0 then return end
+
         local tool = U.findWeaponTool(myChar)
+        
         if not tool then
-            local backpack = lp:FindFirstChildOfClass("Backpack")
-            local backpackTool = U.findWeaponTool(backpack)
-            if backpackTool then
+            local targetTool = lastManualTool
+            
+            if not targetTool or not targetTool.Parent then
+                local backpack = lp:FindFirstChildOfClass("Backpack")
+                targetTool = U.findWeaponTool(backpack)
+            end
+            
+            if targetTool and targetTool.Parent == lp:FindFirstChildOfClass("Backpack") then
                 local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
                 if hum then
-                    hum:EquipTool(backpackTool)
+                    hum:EquipTool(targetTool)
                     task.wait(0.05)
                     tool = U.findWeaponTool(myChar)
                 end
@@ -89,18 +130,16 @@ return function(C, R, UI)
         local hitTargets = tool:FindFirstChild("HitTargets")
         if not swing or not hitTargets then return end
 
-        local validTargets = {}
-        for _, child in ipairs(charsFolder:GetChildren()) do
-            if U.isValidTarget(child, myChar) then
-                if U.distTo(child, rootPos) <= hitRange then
-                    table.insert(validTargets, child)
-                end
+        local targetsInRange = {}
+        for _, target in ipairs(validTargets) do
+            if U.distTo(target, rootPos) <= hitRange then
+                table.insert(targetsInRange, target)
             end
         end
 
-        if #validTargets == 0 then return end
+        if #targetsInRange == 0 then return end
 
         swing:FireServer()
-        hitTargets:FireServer(validTargets)
+        hitTargets:FireServer(targetsInRange)
     end)
 end
