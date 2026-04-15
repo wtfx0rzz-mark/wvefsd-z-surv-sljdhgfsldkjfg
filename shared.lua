@@ -59,6 +59,7 @@ return function(C, R, UI)
     function C.Util.isValidTarget(child, myChar)
         if not child or not child.Parent then return false end
         if child == myChar then return false end
+        if child:GetAttribute("Player") == true then return false end
         local humanoid = child:FindFirstChildOfClass("Humanoid")
         if not humanoid then return false end
         if humanoid.Health <= 0 then return false end
