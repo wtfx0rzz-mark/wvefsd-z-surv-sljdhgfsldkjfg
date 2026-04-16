@@ -10,10 +10,11 @@ return function(C, R, UI)
     local WindUI = UI.Lib
 
     local MAGNET_OFFSET = CFrame.new(0, -2, -3)
+    C.Config.OwnershipRefreshDistance = C.Config.OwnershipRefreshDistance or 10
     local ownedItems = {}
+    local itemStartPositions = {}
 
     local function claimOwnership(item)
-        if ownedItems[item] then return true end
         local drag = item:FindFirstChild("ItemDrag")
         if not drag then return false end
         local remote = drag:FindFirstChild("RequestNetworkOwnership")
@@ -33,8 +34,16 @@ return function(C, R, UI)
         end)
         if ok then
             ownedItems[item] = true
+            itemStartPositions[item] = mainPart.Position
         end
         return ok
+    end
+
+    local function shouldRefreshOwnership(item, handle)
+        local startPos = itemStartPositions[item]
+        if not startPos then return false end
+        local distTraveled = (handle.Position - startPos).Magnitude
+        return distTraveled >= C.Config.OwnershipRefreshDistance
     end
 
     tab:Section({ Title = "Item Magnet" })
@@ -46,6 +55,7 @@ return function(C, R, UI)
             C.State.Toggles.ItemMagnet = on
             if not on then
                 ownedItems = {}
+                itemStartPositions = {}
             end
         end
     })
@@ -64,6 +74,20 @@ return function(C, R, UI)
         end
     })
 
+    tab:Slider({
+        Title = "Refresh Distance",
+        Value = {
+            Min = 5,
+            Max = 50,
+            Default = C.Config.OwnershipRefreshDistance,
+        },
+        Callback = function(v)
+            local n = tonumber(type(v) == "table" and (v.Value or v.Current or v.Default) or v)
+            if not n then return end
+            C.Config.OwnershipRefreshDistance = math.clamp(n, 5, 50)
+        end
+    })
+
     C.Connections.ItemMagnet = RunService.Heartbeat:Connect(function()
         if not C.State.Toggles.ItemMagnet then return end
 
@@ -79,6 +103,11 @@ return function(C, R, UI)
             if handle then
                 local dist = (rootPos - handle.Position).Magnitude
                 if dist <= C.Config.MagnetRadius then
+                    if ownedItems[item] and shouldRefreshOwnership(item, handle) then
+                        ownedItems[item] = nil
+                        itemStartPositions[item] = nil
+                    end
+                    
                     if claimOwnership(item) then
                         pcall(function()
                             handle.Anchored = false
