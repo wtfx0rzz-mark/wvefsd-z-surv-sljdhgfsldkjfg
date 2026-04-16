@@ -38,11 +38,6 @@ local Tabs = {
         Icon = "swords",
         Desc = "Auto hit / targeting",
     }),
-    Items = Window:Tab({
-        Title = "Items",
-        Icon = "package",
-        Desc = "Item magnet / pickup",
-    }),
     Player = Window:Tab({
         Title = "Player",
         Icon = "user",
