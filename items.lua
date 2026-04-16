@@ -10,9 +10,11 @@ return function(C, R, UI)
     local WindUI = UI.Lib
 
     local MAGNET_OFFSET = CFrame.new(0, -2, -3)
+    local PICKUP_DISTANCE = 3
     C.Config.OwnershipRefreshDistance = C.Config.OwnershipRefreshDistance or 10
     local ownedItems = {}
     local itemStartPositions = {}
+    local releasedItems = {}
 
     local function claimOwnership(item)
         local drag = item:FindFirstChild("ItemDrag")
@@ -35,8 +37,22 @@ return function(C, R, UI)
         if ok then
             ownedItems[item] = true
             itemStartPositions[item] = mainPart.Position
+            releasedItems[item] = nil
         end
         return ok
+    end
+
+    local function releaseOwnership(item)
+        if releasedItems[item] then return end
+        local handle = U.getItemHandle(item)
+        if handle then
+            pcall(function()
+                handle:SetNetworkOwner(nil)
+            end)
+            releasedItems[item] = true
+        end
+        ownedItems[item] = nil
+        itemStartPositions[item] = nil
     end
 
     local function shouldRefreshOwnership(item, handle)
@@ -54,8 +70,12 @@ return function(C, R, UI)
         Callback = function(on)
             C.State.Toggles.ItemMagnet = on
             if not on then
+                for item, _ in pairs(ownedItems) do
+                    releaseOwnership(item)
+                end
                 ownedItems = {}
                 itemStartPositions = {}
+                releasedItems = {}
             end
         end
     })
@@ -102,13 +122,18 @@ return function(C, R, UI)
             local handle = U.getItemHandle(item)
             if handle then
                 local dist = (rootPos - handle.Position).Magnitude
-                if dist <= C.Config.MagnetRadius then
+                
+                if dist <= PICKUP_DISTANCE then
+                    if ownedItems[item] then
+                        releaseOwnership(item)
+                    end
+                elseif dist <= C.Config.MagnetRadius then
                     if ownedItems[item] and shouldRefreshOwnership(item, handle) then
                         ownedItems[item] = nil
                         itemStartPositions[item] = nil
                     end
                     
-                    if claimOwnership(item) then
+                    if not releasedItems[item] and claimOwnership(item) then
                         pcall(function()
                             handle.Anchored = false
                             handle.CanCollide = false
