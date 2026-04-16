@@ -40,7 +40,6 @@ _G.UI = UI
 local modules = {
     { name = "shared",  url = BASE_URL .. "shared.lua" },
     { name = "combat",  url = BASE_URL .. "combat.lua" },
-    { name = "items",   url = BASE_URL .. "items.lua" },
     { name = "player",  url = BASE_URL .. "player.lua" },
 }
 
