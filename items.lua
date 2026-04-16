@@ -10,13 +10,14 @@ return function(C, R, UI)
     local WindUI = UI.Lib
 
     local MAGNET_OFFSET = CFrame.new(0, -2, -3)
-    local PICKUP_DISTANCE = 3
+    local PICKUP_DISTANCE = 4
     C.Config.OwnershipRefreshDistance = C.Config.OwnershipRefreshDistance or 10
     local ownedItems = {}
     local itemStartPositions = {}
     local releasedItems = {}
 
     local function claimOwnership(item)
+        if releasedItems[item] then return false end
         local drag = item:FindFirstChild("ItemDrag")
         if not drag then return false end
         local remote = drag:FindFirstChild("RequestNetworkOwnership")
@@ -37,22 +38,33 @@ return function(C, R, UI)
         if ok then
             ownedItems[item] = true
             itemStartPositions[item] = mainPart.Position
-            releasedItems[item] = nil
         end
         return ok
     end
 
     local function releaseOwnership(item)
         if releasedItems[item] then return end
+        
         local handle = U.getItemHandle(item)
         if handle then
             pcall(function()
-                handle:SetNetworkOwner(nil)
+                handle.Anchored = true
+                handle.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                handle.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
             end)
-            releasedItems[item] = true
+            task.wait(0.1)
+            pcall(function()
+                handle.Anchored = false
+            end)
         end
+        
         ownedItems[item] = nil
         itemStartPositions[item] = nil
+        releasedItems[item] = true
+        
+        task.delay(5, function()
+            releasedItems[item] = nil
+        end)
     end
 
     local function shouldRefreshOwnership(item, handle)
@@ -75,7 +87,6 @@ return function(C, R, UI)
                 end
                 ownedItems = {}
                 itemStartPositions = {}
-                releasedItems = {}
             end
         end
     })
@@ -95,7 +106,7 @@ return function(C, R, UI)
     })
 
     tab:Slider({
-        Title = "Refresh Distance",
+        Title = "Refresh Distance:",
         Value = {
             Min = 5,
             Max = 50,
@@ -133,7 +144,7 @@ return function(C, R, UI)
                         itemStartPositions[item] = nil
                     end
                     
-                    if not releasedItems[item] and claimOwnership(item) then
+                    if claimOwnership(item) then
                         pcall(function()
                             handle.Anchored = false
                             handle.CanCollide = false
