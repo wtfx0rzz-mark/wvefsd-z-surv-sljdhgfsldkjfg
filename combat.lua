@@ -21,6 +21,14 @@ return function(C, R, UI)
         end
     })
 
+    tab:Toggle({
+        Title = "Weapon Cycling",
+        Value = C.State.Toggles.WeaponCycling,
+        Callback = function(on)
+            C.State.Toggles.WeaponCycling = on
+        end
+    })
+
     tab:Slider({
         Title = "Hit Range Bonus",
         Value = {
@@ -37,6 +45,7 @@ return function(C, R, UI)
 
     local lastWeaponName = ""
     local lastManualTool = nil
+    local weaponCycleIndex = 1
 
     local function setupCharacterTracking()
         local char = U.getChar()
@@ -57,6 +66,26 @@ return function(C, R, UI)
     end)
     
     setupCharacterTracking()
+
+    local function getAllWeapons()
+        local weapons = {}
+        local backpack = lp:FindFirstChildOfClass("Backpack")
+        if backpack then
+            for _, tool in ipairs(backpack:GetChildren()) do
+                if tool:IsA("Tool") and tool:FindFirstChild("Swing") and tool:FindFirstChild("HitTargets") then
+                    table.insert(weapons, tool)
+                end
+            end
+        end
+        local char = U.getChar()
+        if char then
+            local equipped = U.findWeaponTool(char)
+            if equipped then
+                table.insert(weapons, equipped)
+            end
+        end
+        return weapons
+    end
 
     C.Connections.AutoHit = RunService.Heartbeat:Connect(function()
         local char = U.getChar()
@@ -83,64 +112,103 @@ return function(C, R, UI)
         if not charsFolder then return end
 
         local myChar = U.getChar()
-        local tool = U.findWeaponTool(myChar)
 
-        local potentialRange
-        if tool then
-            potentialRange = U.getWeaponRange(tool) + C.Config.HitRangeBonus
-        else
-            local targetTool = lastManualTool
-            if not targetTool or not targetTool.Parent then
-                local backpack = lp:FindFirstChildOfClass("Backpack")
-                targetTool = U.findWeaponTool(backpack)
-            end
-            if targetTool then
-                potentialRange = U.getWeaponRange(targetTool) + C.Config.HitRangeBonus
-            else
-                return
-            end
-        end
+        if C.State.Toggles.WeaponCycling then
+            local weapons = getAllWeapons()
+            if #weapons == 0 then return end
 
-        local validTargets = {}
-        for _, child in ipairs(charsFolder:GetChildren()) do
-            if U.isValidTarget(child, myChar) then
-                if U.distTo(child, rootPos) <= potentialRange then
-                    table.insert(validTargets, child)
+            weaponCycleIndex = (weaponCycleIndex % #weapons) + 1
+            local targetWeapon = weapons[weaponCycleIndex]
+            
+            if not targetWeapon then return end
+
+            local potentialRange = U.getWeaponRange(targetWeapon) + C.Config.HitRangeBonus
+
+            local validTargets = {}
+            for _, child in ipairs(charsFolder:GetChildren()) do
+                if U.isValidTarget(child, myChar) then
+                    if U.distTo(child, rootPos) <= potentialRange then
+                        table.insert(validTargets, child)
+                    end
                 end
             end
-        end
 
-        if #validTargets == 0 then return end
+            if #validTargets == 0 then return end
 
-        if not tool then
-            local targetTool = lastManualTool
-            if not targetTool or not targetTool.Parent then
-                local backpack = lp:FindFirstChildOfClass("Backpack")
-                targetTool = U.findWeaponTool(backpack)
-            end
-            
-            if targetTool and targetTool.Parent == lp:FindFirstChildOfClass("Backpack") then
+            if targetWeapon.Parent ~= myChar then
                 local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
                 if hum then
-                    hum:EquipTool(targetTool)
+                    hum:EquipTool(targetWeapon)
                     task.wait(0.05)
-                    tool = U.findWeaponTool(myChar)
                 end
             end
+
+            local swing = targetWeapon:FindFirstChild("Swing")
+            local hitTargets = targetWeapon:FindFirstChild("HitTargets")
+            if swing and hitTargets then
+                swing:FireServer()
+                hitTargets:FireServer(validTargets)
+            end
+        else
+            local tool = U.findWeaponTool(myChar)
+
+            local potentialRange
+            if tool then
+                potentialRange = U.getWeaponRange(tool) + C.Config.HitRangeBonus
+            else
+                local targetTool = lastManualTool
+                if not targetTool or not targetTool.Parent then
+                    local backpack = lp:FindFirstChildOfClass("Backpack")
+                    targetTool = U.findWeaponTool(backpack)
+                end
+                if targetTool then
+                    potentialRange = U.getWeaponRange(targetTool) + C.Config.HitRangeBonus
+                else
+                    return
+                end
+            end
+
+            local validTargets = {}
+            for _, child in ipairs(charsFolder:GetChildren()) do
+                if U.isValidTarget(child, myChar) then
+                    if U.distTo(child, rootPos) <= potentialRange then
+                        table.insert(validTargets, child)
+                    end
+                end
+            end
+
+            if #validTargets == 0 then return end
+
+            if not tool then
+                local targetTool = lastManualTool
+                if not targetTool or not targetTool.Parent then
+                    local backpack = lp:FindFirstChildOfClass("Backpack")
+                    targetTool = U.findWeaponTool(backpack)
+                end
+                
+                if targetTool and targetTool.Parent == lp:FindFirstChildOfClass("Backpack") then
+                    local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum:EquipTool(targetTool)
+                        task.wait(0.05)
+                        tool = U.findWeaponTool(myChar)
+                    end
+                end
+            end
+
+            if not tool then return end
+
+            local weaponName = tool.Name
+            if weaponName ~= lastWeaponName then
+                lastWeaponName = weaponName
+            end
+
+            local swing = tool:FindFirstChild("Swing")
+            local hitTargets = tool:FindFirstChild("HitTargets")
+            if not swing or not hitTargets then return end
+
+            swing:FireServer()
+            hitTargets:FireServer(validTargets)
         end
-
-        if not tool then return end
-
-        local weaponName = tool.Name
-        if weaponName ~= lastWeaponName then
-            lastWeaponName = weaponName
-        end
-
-        local swing = tool:FindFirstChild("Swing")
-        local hitTargets = tool:FindFirstChild("HitTargets")
-        if not swing or not hitTargets then return end
-
-        swing:FireServer()
-        hitTargets:FireServer(validTargets)
     end)
 end
